@@ -1,0 +1,7 @@
+POST http://app:5000/login 
+Content-Type: application/json
+
+{
+	"username": "tasantiago",
+	"password": "12345678"
+}

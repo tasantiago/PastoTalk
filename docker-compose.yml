@@ -1,0 +1,36 @@
+version: '3'
+
+services:
+  api:
+    build:
+      context: .
+    volumes:
+      - .:/home/appuser/app
+      - ./.docker/zsh/powerlevel10k/.p10k.zsh:/home/appuser/.p10k.zsh:delegated
+      - ./.docker/zsh/history:/home/appuser/zsh:delegated
+
+    ports:
+      - "5000:5000"
+
+  webapp:
+    build:
+      context: .
+      dockerfile: Dockerfile-react
+    volumes:
+      - .:/home/node/app
+      - ./.docker/zsh/powerlevel10k/.p10k.zsh:/home/node/.p10k.zsh:delegated
+      - ./.docker/zsh/history:/home/node/zsh:delegated
+    ports:
+      - "3000:3000"
+
+  db:
+    image: postgres:latest
+    restart: always
+    environment:
+      POSTGRES_DB: controledegado
+      POSTGRES_USER: myusername
+      POSTGRES_PASSWORD: mypassword
+    ports:
+      - 5432:5432
+    volumes:
+      - ./data:/var/lib/postgresql/data
