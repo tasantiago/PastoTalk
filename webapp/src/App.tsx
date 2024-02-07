@@ -1,25 +1,29 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import type { Router as RemixRouter } from '@remix-run/router';
+import { createBrowserRouter, RouteObject, RouterProvider } from 'react-router-dom';
 
-import { Login } from './components/Login';
 import { ProtectedLayout } from './components/ProtectedLayout';
 import { AuthProvider } from './context/AuthProvider';
+import { firstScreenRoutes } from './modules/firstScreen/routes';
+import { loginRoutes } from './modules/loginScreen/routes';
 
 function App() {
+  const allRoutesProtected = [...firstScreenRoutes];
+
+  const applyProtectedLayout = (routes: RouteObject[]) => {
+    return routes.map((route) => ({
+      ...route,
+      element: <ProtectedLayout>{route.element}</ProtectedLayout>,
+    }));
+  };
+
+  const router: RemixRouter = createBrowserRouter([
+    ...applyProtectedLayout(allRoutesProtected),
+    ...loginRoutes,
+  ]);
+
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route
-            path="/profile"
-            element={
-              <ProtectedLayout>
-                <h2>Olá, esse é o componente profile</h2>
-              </ProtectedLayout>
-            }
-          />
-          <Route path="/login" element={<Login />} />
-        </Routes>
-      </BrowserRouter>
+      <RouterProvider router={router} />
     </AuthProvider>
   );
 }

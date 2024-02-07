@@ -1,6 +1,7 @@
-import { Button, Col, Form, Input, Row, message } from 'antd';
-import { useAuth } from '../../context/AuthProvider/useAuth';
+import { Button, Col, Form, Input, message, Row } from 'antd';
 import { useNavigate } from 'react-router-dom';
+
+import { useAuth } from '../../context/AuthProvider/useAuth';
 
 export const Login = () => {
   const auth = useAuth();

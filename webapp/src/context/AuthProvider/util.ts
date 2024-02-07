@@ -1,12 +1,13 @@
 import { Api } from '../../services/api';
+import { AUTHORIZATION_KEY } from '../../shared/constants/authorizationConstants';
 import { IUser } from './types';
 
 export function setUserLocalStorage(user: IUser | null) {
-  localStorage.setItem('u', JSON.stringify(user));
+  localStorage.setItem(AUTHORIZATION_KEY, JSON.stringify(user));
 }
 
 export function getUserLocalStorage() {
-  const json = localStorage.getItem('u');
+  const json = localStorage.getItem(AUTHORIZATION_KEY);
 
   if (!json) {
     return null;

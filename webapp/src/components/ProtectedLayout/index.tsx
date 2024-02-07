@@ -1,11 +1,12 @@
-import { useAuth } from '../../context/AuthProvider/useAuth';
+import { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 
-export const ProtectedLayout = ({ children }: { children: JSX.Element }) => {
-  const auth = useAuth();
+import { getUserLocalStorage } from '../../context/AuthProvider/util';
 
-  console.log(auth);
-  if (!auth.user?.id) {
+export const ProtectedLayout = ({ children }: { children: ReactNode }) => {
+  const token = getUserLocalStorage();
+
+  if (!token.user?.id) {
     return <Navigate to="/login" replace />;
   }
 
