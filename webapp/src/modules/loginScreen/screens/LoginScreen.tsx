@@ -1,5 +1,5 @@
-import { faEye, faEyeSlash, faLock, faUser } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faLock, faUser } from '@fortawesome/free-solid-svg-icons';
+import { message } from 'antd';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -10,7 +10,6 @@ import {
   CreateAccountButton,
   GlassDiv,
   Icon,
-  IconButton,
   Input,
   InputField,
   LeftContainer,
@@ -29,7 +28,6 @@ const LoginScreen = () => {
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const onFinish = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -40,6 +38,8 @@ const LoginScreen = () => {
       navigate('/dashboard');
     } catch (error) {
       alert('invalid email or password');
+      message.error('Invalid email or password');
+
       setLoading(false);
     }
   };
@@ -71,14 +71,11 @@ const LoginScreen = () => {
               <InputField>
                 <Icon icon={faLock} />
                 <Input
-                  type={showPassword ? 'text' : 'password'}
+                  type={'password'}
                   placeholder="Senha"
                   onChange={(e) => setPassword(e.target.value)}
                   value={password}
                 />
-                <IconButton onClick={() => setShowPassword(!showPassword)}>
-                  <FontAwesomeIcon icon={showPassword ? faEyeSlash : faEye} />
-                </IconButton>
               </InputField>
               <SubmitButton type="submit" disabled={loading}>
                 {loading ? <Spinner /> : 'Entrar'}

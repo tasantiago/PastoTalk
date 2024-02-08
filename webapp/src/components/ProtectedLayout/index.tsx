@@ -6,7 +6,7 @@ import { getUserLocalStorage } from '../../context/AuthProvider/util';
 export const ProtectedLayout = ({ children }: { children: ReactNode }) => {
   const token = getUserLocalStorage();
 
-  if (!token.user?.id) {
+  if (!token?.user.id) {
     return <Navigate to="/login" replace />;
   }
 

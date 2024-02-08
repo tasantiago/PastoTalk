@@ -3,11 +3,12 @@ import { createBrowserRouter, RouteObject, RouterProvider } from 'react-router-d
 
 import { ProtectedLayout } from './components/ProtectedLayout';
 import { AuthProvider } from './context/AuthProvider';
+import { dashboardRoutes } from './modules/dashBoard/routes';
 import { firstScreenRoutes } from './modules/firstScreen/routes';
 import { loginRoutes } from './modules/loginScreen/routes';
 
 function App() {
-  const allRoutesProtected = [...firstScreenRoutes];
+  const allRoutesProtected = [...firstScreenRoutes, ...dashboardRoutes];
 
   const applyProtectedLayout = (routes: RouteObject[]) => {
     return routes.map((route) => ({

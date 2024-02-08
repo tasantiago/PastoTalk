@@ -213,21 +213,6 @@ export const Input = styled.input`
   }
 `;
 
-export const IconButton = styled.button`
-  position: absolute;
-  top: 50%;
-  right: 25px; // Ajustado para alinhar com a borda interna do Input
-  transform: translateY(-50%);
-  background-color: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 0; // Remova qualquer padding para o botão ficar alinhado
-
-  &:focus {
-    outline: none;
-  }
-`;
-
 // Ícone de estilos
 export const Icon = styled(FontAwesomeIcon)`
   position: absolute;
