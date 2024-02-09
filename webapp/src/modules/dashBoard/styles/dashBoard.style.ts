@@ -1,4 +1,4 @@
-import styled from 'styled-components';
+import styled, { css } from 'styled-components';
 
 export const SidebarContainer = styled.nav`
   position: fixed;
@@ -15,22 +15,66 @@ export const SidebarContainer = styled.nav`
   align-items: center;
 `;
 
-export const List = styled.ul`
+export const UserProfilePicture = styled.img`
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  margin-bottom: 10px;
+  margin-top: 40px;
+`;
+
+export const UserDisplayName = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  margin-bottom: 20px;
+`;
+
+export const List = styled.ul<{ marginTop?: string; isActive?: boolean }>`
   list-style: none;
   width: 100%;
+  background-color: ${({ isActive }) => (isActive ? 'rgba(91, 156, 129, 0.5)' : 'transparent')};
+  ${({ marginTop }) =>
+    marginTop &&
+    css`
+      margin-top: ${marginTop};
+    `}
   margin-top: 20px;
+`;
+
+export const Typography = styled.p`
+  margin: 0;
+  padding: 5px 0;
 `;
 
 export const ListItem = styled.li`
   width: 100%;
-  height: 50px;
+  height: 40px;
   margin: 5px 0;
   display: flex;
   align-items: center;
-  background: pink;
   border-radius: 6px;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(91, 156, 129, 0.2);
   }
+`;
+
+interface AccordionContentProps {
+  $expanded: boolean;
+}
+
+export const AccordionContent = styled.div<AccordionContentProps>`
+  width: 100%;
+  max-height: ${({ $expanded }) => ($expanded ? '1000px' : '0')};
+  transition: max-height 0.3s ease-in-out;
+  overflow: hidden;
+`;
+
+export const Icon = styled.img`
+  width: 25px;
+  max-width: 100%;
+  height: auto;
+  margin-right: 15px;
 `;
