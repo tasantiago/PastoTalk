@@ -1,0 +1,52 @@
+name: PastoTalk
+on: [push, pull_request]
+jobs:
+ frontend:
+  runs-on: ubuntu-latest
+  defaults:
+   run:
+    working-directory: webapp
+  steps:
+   - uses: actions/checkout@v4
+   - uses: actions/setup-node@v4
+     with:
+      node-version: 22
+      cache: npm
+      cache-dependency-path: webapp/package-lock.json
+   - run: npm ci
+   - run: npm run lint
+   - run: npm run build
+ backend:
+  runs-on: ubuntu-latest
+  services:
+   postgres:
+    image: postgres:16
+    env:
+     POSTGRES_DB: controledegado
+     POSTGRES_USER: pastotalk
+     POSTGRES_PASSWORD: integration-tests-only
+    ports:
+     - 5432:5432
+    options: >-
+     --health-cmd "pg_isready -U pastotalk -d controledegado"
+     --health-interval 5s --health-timeout 5s --health-retries 12
+  env:
+   DATABASE_URL: postgres://pastotalk:integration-tests-only@localhost:5432/controledegado?sslmode=disable
+   JWT_SECRET: integration-tests-only-key-with-more-than-32-characters
+   PGPASSWORD: integration-tests-only
+  steps:
+   - uses: actions/checkout@v4
+   - uses: actions/setup-go@v5
+     with:
+      go-version: '1.25'
+      cache-dependency-path: api/src/go.sum
+   - run: psql -h localhost -U pastotalk -d controledegado -v ON_ERROR_STOP=1 -f api/sql/start.sql
+   - run: go test -race ./...
+     working-directory: api/src
+   - run: go vet ./...
+     working-directory: api/src
+   - run: go build -o /tmp/pastotalk .
+     working-directory: api/src
+   - run: |
+      /tmp/pastotalk > /tmp/api.log 2>&1 &
+      python3 tests/integration.py

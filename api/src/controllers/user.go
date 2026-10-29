@@ -6,186 +6,100 @@ import (
 	"api/models"
 	"api/repositories"
 	"api/responses"
-	"encoding/json"
+	"api/security"
+	"database/sql"
 	"errors"
-	"fmt"
-	"io"
 	"net/http"
 	"strings"
-
-	"github.com/google/uuid"
-	"github.com/gorilla/mux"
 )
 
 func CreateUser(w http.ResponseWriter, r *http.Request) {
-	requestBody, err := io.ReadAll(r.Body)
+	var body struct {
+		Name     string `json:"name"`
+		Email    string `json:"email"`
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	u := models.User{Name: body.Name, Email: body.Email, Username: body.Username}
+	if err := u.Validate(); err != nil {
+		responses.Erro(w, 400, err)
+		return
+	}
+	if len(body.Password) < 8 || len(body.Password) > 72 {
+		responses.Erro(w, 400, errors.New("senha deve ter entre 8 e 72 caracteres"))
+		return
+	}
+	hash, err := security.Hash(body.Password)
 	if err != nil {
-		responses.Erro(w, http.StatusUnprocessableEntity, err)
+		failure(w, err)
 		return
 	}
-
-	var user models.User
-	if err = json.Unmarshal(requestBody, &user); err != nil {
-		responses.Erro(w, http.StatusBadRequest, err)
-		return
-	}
-
-	if err = user.Prepare("register"); err != nil {
-		responses.Erro(w, http.StatusBadRequest, err)
-		return
-	}
-
-	db, err := database.Connect()
+	u.Password = string(hash)
+	u.ID, err = repositories.NewUsersRepository(database.DB).Create(r.Context(), u)
 	if err != nil {
-		responses.Erro(w, http.StatusInternalServerError, err)
+		failure(w, err)
 		return
 	}
-
-	defer db.Close()
-
-	repo := repositories.NewUsersRepository(db)
-
-	user.ID, err = repo.Create(user)
-	if err != nil {
-		responses.Erro(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	responses.JSON(w, http.StatusCreated, user)
+	responses.JSON(w, 201, u)
 }
-
-func GetUsers(w http.ResponseWriter, r *http.Request) {
-	nameOrNick := strings.ToLower(r.URL.Query().Get("user"))
-	db, err := database.Connect()
-	if err != nil {
-		responses.Erro(w, http.StatusInternalServerError, err)
+func Login(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if !decode(w, r, &body) {
 		return
 	}
-
-	defer db.Close()
-
-	repo := repositories.NewUsersRepository(db)
-	users, err := repo.Search(nameOrNick)
-	if err != nil {
-		responses.Erro(w, http.StatusInternalServerError, err)
+	body.Username = strings.ToLower(strings.TrimSpace(body.Username))
+	if body.Username == "" || body.Password == "" || len(body.Password) > 72 {
+		responses.Erro(w, 400, errors.New("informe usuário e senha"))
 		return
 	}
-	responses.JSON(w, http.StatusOK, users)
+	u, err := repositories.NewUsersRepository(database.DB).SearchByUsername(r.Context(), body.Username)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		failure(w, err)
+		return
+	}
+	if err != nil || security.VerifyPassword(u.Password, body.Password) != nil {
+		responses.Erro(w, 401, errors.New("usuário ou senha incorretos"))
+		return
+	}
+	token, err := auth.CreateToken(u.ID)
+	if err != nil {
+		failure(w, err)
+		return
+	}
+	responses.JSON(w, 200, map[string]interface{}{"token": token, "user": map[string]interface{}{"id": u.ID, "nome": u.Name}})
 }
-
-func GetUser(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-
-	userID, err := uuid.Parse(params["userId"])
+func Me(w http.ResponseWriter, r *http.Request) {
+	id, _ := auth.ExtractUserID(r)
+	repo := repositories.NewUsersRepository(database.DB)
+	if r.Method == http.MethodPut {
+		var body struct {
+			Name     string `json:"name"`
+			Email    string `json:"email"`
+			Username string `json:"username"`
+		}
+		if !decode(w, r, &body) {
+			return
+		}
+		u := models.User{Name: body.Name, Email: body.Email, Username: body.Username}
+		if err := u.Validate(); err != nil {
+			responses.Erro(w, 400, err)
+			return
+		}
+		if err := repo.Update(r.Context(), id, u); err != nil {
+			failure(w, err)
+			return
+		}
+	}
+	u, err := repo.SearchByID(r.Context(), id)
 	if err != nil {
-		responses.Erro(w, http.StatusBadRequest, err)
+		failure(w, err)
 		return
 	}
-
-	db, err := database.Connect()
-	if err != nil {
-		responses.Erro(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	defer db.Close()
-
-	repo := repositories.NewUsersRepository(db)
-	user, err := repo.SearchByID(userID)
-	if err != nil {
-		responses.Erro(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	responses.JSON(w, http.StatusOK, user)
-}
-
-func UpdateUser(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	userID, err := uuid.Parse(params["userId"])
-	if err != nil {
-		responses.Erro(w, http.StatusBadRequest, err)
-		return
-	}
-
-	userIDFromToken, err := auth.ExtractUserID(r)
-	if err != nil {
-		responses.Erro(w, http.StatusUnauthorized, err)
-		return
-	}
-
-	if userID != userIDFromToken {
-		responses.Erro(w, http.StatusForbidden, errors.New("cannot update this user"))
-		return
-	}
-
-	requestBody, err := io.ReadAll(r.Body)
-	if err != nil {
-		responses.Erro(w, http.StatusUnsupportedMediaType, err)
-		return
-	}
-
-	var user models.User
-	if err = json.Unmarshal(requestBody, &user); err != nil {
-		responses.Erro(w, http.StatusBadRequest, err)
-		return
-	}
-
-	if err = user.Prepare("edit"); err != nil {
-		responses.Erro(w, http.StatusBadRequest, err)
-		return
-	}
-
-	db, err := database.Connect()
-	if err != nil {
-		responses.Erro(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	defer db.Close()
-
-	repo := repositories.NewUsersRepository(db)
-	if err = repo.Update(userID, user); err != nil {
-		responses.Erro(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	responses.JSON(w, http.StatusNoContent, nil)
-}
-
-func DeleteUser(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	userID, err := uuid.Parse(params["userId"])
-	if err != nil {
-		responses.Erro(w, http.StatusBadRequest, err)
-		return
-	}
-
-	userIDFromToken, err := auth.ExtractUserID(r)
-	if err != nil {
-		responses.Erro(w, http.StatusUnauthorized, err)
-		return
-	}
-	fmt.Println(userIDFromToken)
-	fmt.Println(userID)
-
-	if userID != userIDFromToken {
-		responses.Erro(w, http.StatusForbidden, errors.New("cannot delete user"))
-		return
-	}
-	db, err := database.Connect()
-	if err != nil {
-		responses.Erro(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	defer db.Close()
-
-	repo := repositories.NewUsersRepository(db)
-	if err = repo.Delete(userID); err != nil {
-		responses.Erro(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	responses.JSON(w, http.StatusNoContent, nil)
+	responses.JSON(w, 200, u)
 }

@@ -1,36 +1,54 @@
-version: '3'
-
 services:
-  api:
-    build:
-      context: .
-    volumes:
-      - .:/home/appuser/app
-      - ./.docker/zsh/powerlevel10k/.p10k.zsh:/home/appuser/.p10k.zsh:delegated
-      - ./.docker/zsh/history:/home/appuser/zsh:delegated
-
-    ports:
-      - "5000:5000"
-
-  webapp:
-    build:
-      context: .
-      dockerfile: Dockerfile-react
-    volumes:
-      - .:/home/node/app
-      - ./.docker/zsh/powerlevel10k/.p10k.zsh:/home/node/.p10k.zsh:delegated
-      - ./.docker/zsh/history:/home/node/zsh:delegated
-    ports:
-      - "3000:3000"
-
-  db:
-    image: postgres:latest
-    restart: always
-    environment:
-      POSTGRES_DB: controledegado
-      POSTGRES_USER: myusername
-      POSTGRES_PASSWORD: mypassword
-    ports:
-      - 5432:5432
-    volumes:
-      - ./data:/var/lib/postgresql/data
+ db:
+  image: postgres:16-alpine
+  environment:
+   POSTGRES_DB: controledegado
+   POSTGRES_USER: pastotalk
+   POSTGRES_PASSWORD: ${DB_PASSWORD:?Configure DB_PASSWORD}
+   TZ: America/Porto_Velho
+  volumes:
+   - postgres_data:/var/lib/postgresql/data
+   - ./api/sql/start.sql:/docker-entrypoint-initdb.d/001-start.sql:ro
+  healthcheck:
+   test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U pastotalk -d controledegado"]
+   interval: 5s
+   timeout: 5s
+   retries: 12
+  restart: unless-stopped
+ api:
+  build:
+   context: .
+   dockerfile: Dockerfile
+  environment:
+   API_PORT: 5000
+   DB_HOST: db
+   DB_PORT: 5432
+   DB_NAME: controledegado
+   DB_USERNAME: pastotalk
+   DB_PASSWORD: ${DB_PASSWORD:?Configure DB_PASSWORD}
+   JWT_SECRET: ${JWT_SECRET:?Configure JWT_SECRET}
+   CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+   TZ: America/Porto_Velho
+  ports:
+   - "127.0.0.1:5000:5000"
+  depends_on:
+   db:
+    condition: service_healthy
+  healthcheck:
+   test: ["CMD", "/pastotalk", "-healthcheck"]
+   interval: 10s
+   timeout: 5s
+   retries: 6
+  restart: unless-stopped
+ webapp:
+  build:
+   context: .
+   dockerfile: Dockerfile-react
+  ports:
+   - "3000:80"
+  depends_on:
+   api:
+    condition: service_healthy
+  restart: unless-stopped
+volumes:
+ postgres_data:

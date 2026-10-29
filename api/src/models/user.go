@@ -1,72 +1,36 @@
 package models
 
 import (
-	"api/security"
 	"errors"
-	"strings"
-	"time"
-
-	"github.com/badoux/checkmail"
 	"github.com/google/uuid"
+	"net/mail"
+	"regexp"
+	"strings"
 )
 
-// User representa a tabela de usuários
 type User struct {
-	ID        uuid.UUID `json:"id,omitempty"`
-	Name      string    `json:"name,omitempty"`
-	Email     string    `json:"email,omitempty"`
-	Username  string    `json:"username,omitempty"`
-	Password  string    `json:"password,omitempty"`
-	CreatedAt time.Time `json:"createdat,omitempty"`
+	ID       uuid.UUID `json:"id"`
+	Name     string    `json:"name"`
+	Email    string    `json:"email"`
+	Username string    `json:"username"`
+	Password string    `json:"-"`
 }
 
-func (user *User) Prepare(stage string) error {
-	if erro := user.format(stage); erro != nil {
-		return erro
+var usernameFormat = regexp.MustCompile(`^[a-z0-9_.-]+$`)
+
+func (u *User) Validate() error {
+	u.Name = strings.TrimSpace(u.Name)
+	u.Email = strings.TrimSpace(u.Email)
+	u.Username = strings.ToLower(strings.TrimSpace(u.Username))
+	if err := Text(u.Name, "nome", 255); err != nil {
+		return err
 	}
-
-	if erro := user.validate(stage); erro != nil {
-		return erro
+	if !usernameFormat.MatchString(u.Username) || len(u.Username) > 80 {
+		return errors.New("usuário deve ter até 80 caracteres: letras, números, ponto, hífen ou sublinhado")
 	}
-
-	return nil
-}
-
-func (user *User) validate(stage string) error {
-	if user.Name == "" {
-		return errors.New("The name is required and cannot be blank.")
+	m, err := mail.ParseAddress(u.Email)
+	if err != nil || m.Address != u.Email || len(u.Email) > 255 {
+		return errors.New("informe um e-mail válido")
 	}
-	if user.Username == "" {
-		return errors.New("The username is required and cannot be blank.")
-	}
-	if user.Email == "" {
-		return errors.New("The name is required and cannot be blank.")
-	}
-
-	if erro := checkmail.ValidateFormat(user.Email); erro != nil {
-		return errors.New("The name is required and cannot be blank.")
-	}
-
-	if stage == "register" && user.Password == "" {
-		return errors.New("Email is not valid")
-	}
-
-	return nil
-}
-
-func (user *User) format(stage string) error {
-	user.Name = strings.TrimSpace(user.Name)
-	user.Username = strings.TrimSpace(user.Username)
-	user.Email = strings.TrimSpace(user.Email)
-
-	if stage == "register" {
-		passwordWithHash, erro := security.Hash(user.Password)
-		if erro != nil {
-			return erro
-		}
-
-		user.Password = string(passwordWithHash)
-	}
-
 	return nil
 }

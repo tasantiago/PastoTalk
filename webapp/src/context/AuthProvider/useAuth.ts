@@ -1,9 +1,8 @@
 import { useContext } from 'react';
 
-import { AuthContext } from '.';
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-
-  return context;
-};
+import { AuthContext } from './index';
+export function useAuth() {
+  const a = useContext(AuthContext);
+  if (!a) throw new Error('AuthContext ausente');
+  return a;
+}

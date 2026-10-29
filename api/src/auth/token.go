@@ -3,70 +3,30 @@ package auth
 import (
 	"api/config"
 	"errors"
-	"fmt"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"net/http"
 	"strings"
 	"time"
-
-	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/google/uuid"
 )
 
-func CreateToken(userID uuid.UUID) (string, error) {
-	claims := jwt.MapClaims{}
-	claims["authorized"] = true
-	claims["exp"] = time.Now().Add(time.Hour * 100).Unix()
-	claims["userID"] = userID
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(config.SecretKey))
+func CreateToken(id uuid.UUID) (string, error) {
+	claims := jwt.RegisteredClaims{Issuer: "pastotalk", Subject: id.String(), IssuedAt: jwt.NewNumericDate(time.Now()), ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour))}
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(config.SecretKey)
 }
-
-func ValidateToken(r *http.Request) error {
-	tokenString := extractToken(r)
-	token, err := jwt.Parse(tokenString, returnVerificationKey)
-	if err != nil {
-		return err
-	}
-
-	if _, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		return nil
-	}
-
-	return errors.New("invalid token")
-}
-
 func ExtractUserID(r *http.Request) (uuid.UUID, error) {
-	tokenString := extractToken(r)
-	token, err := jwt.Parse(tokenString, returnVerificationKey)
-	if err != nil {
-		return uuid.Nil, err
+	parts := strings.Fields(r.Header.Get("Authorization"))
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		return uuid.Nil, errors.New("token inválido")
 	}
-
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		userID, erro := uuid.Parse(fmt.Sprintf("%v", claims["userID"]))
-		if erro != nil {
-			return uuid.Nil, erro
-		}
-		return userID, nil
+	claims := &jwt.RegisteredClaims{}
+	token, err := jwt.ParseWithClaims(parts[1], claims, func(t *jwt.Token) (interface{}, error) { return config.SecretKey, nil }, jwt.WithValidMethods([]string{"HS256"}), jwt.WithIssuer("pastotalk"), jwt.WithExpirationRequired())
+	if err != nil || !token.Valid {
+		return uuid.Nil, errors.New("sessão inválida ou expirada")
 	}
-
-	return uuid.Nil, errors.New("token inválido")
-}
-
-func extractToken(r *http.Request) string {
-	token := r.Header.Get("Authorization")
-
-	if len(strings.Split(token, " ")) == 2 {
-		return strings.Split(token, " ")[1]
+	id, err := uuid.Parse(claims.Subject)
+	if err != nil || id == uuid.Nil {
+		return uuid.Nil, errors.New("token inválido")
 	}
-
-	return " "
-}
-
-func returnVerificationKey(token *jwt.Token) (interface{}, error) {
-	if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-		return nil, fmt.Errorf("unexpected signing method! %v", token.Header["alg"])
-	}
-
-	return config.SecretKey, nil
+	return id, nil
 }
